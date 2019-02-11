@@ -111,7 +111,7 @@ namespace server
             _msReceive.Write(_bufReceive, 0, bufLen);
 
             // processing data
-            _loger.Write("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
+            //_loger.Write("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
 
             // analys head 
 
@@ -152,9 +152,9 @@ namespace server
                         string str = Encoding.Unicode.GetString(_readerReceive.ReadBytes(_lengthDataReceive));
                         _loger.Write("str " + str);
 
-                        _loger.Write("Length _MS before " + _msReceive.Length.ToString());
+                        //_loger.Write("Length _MS before " + _msReceive.Length.ToString());
                         TruncateMemoryStreamFromTop(_msReceive, (int)_msReceive.Position);
-                        _loger.Write("Length _MS after " + _msReceive.Length.ToString());
+                        //_loger.Write("Length _MS after " + _msReceive.Length.ToString());
 
                         break;
                     case commands.sendFile:
