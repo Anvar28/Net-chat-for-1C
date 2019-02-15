@@ -28,7 +28,6 @@ namespace server
         private TStatusSocket _statusReceive;
         private int _lengthDataReceive;
 
-        private BinaryWriter _writer;
         public string name;
         private SendStringAll sendStringAll;
         private ILoger _loger;
@@ -42,7 +41,6 @@ namespace server
             _bufReceive = new byte[10];
             _msReceive = new MemoryStream();
             _readerReceive = new BinaryReader(_msReceive);
-            _writer = new BinaryWriter(_msReceive);
 
             sendStringAll = lSendStringAll;
 
@@ -57,15 +55,25 @@ namespace server
 
         public void SendString(string str)
         {
-            ClearBuff();
-            _writer.Write((Int32)server.commands.sendString);
-            _writer.Write(str);
-            Send();
+            MemoryStream ms = new MemoryStream();
+            BinaryWriter writer = new BinaryWriter(ms);
+            writer.Write((Int32)server.commands.sendString);
+            byte[] _bufData = Encoding.Unicode.GetBytes(str);
+            writer.Write((Int32)_bufData.Length);
+            writer.Write(_bufData);
+            Send(ms);
         }
 
-        private void Send()
+        private void Send(MemoryStream ms)
         {
-            _socket.Send(_msReceive.ToArray());
+            try
+            {
+                _socket.Send(ms.ToArray());
+            }
+            catch (Exception)
+            {
+                _loger.Write("Ошибка отправки данных");
+            }
         }
 
         public void Close()
@@ -104,14 +112,22 @@ namespace server
             catch (Exception)
             {
                 _loger.Write("Connect close");
+                Disconnect();
                 return;
             }            
+
+            if (bufLen == 0)
+            {
+                _loger.Write("Receive bufLen = 0");
+                Disconnect();
+                return;
+            }
 
             // copy data to memory
             _msReceive.Write(_bufReceive, 0, bufLen);
 
             // processing data
-            //_loger.Write("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
+            _loger.Write("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
 
             // analys head 
 
@@ -122,6 +138,12 @@ namespace server
                 // read command and length 
                 _commandReceive = (server.commands)_readerReceive.ReadInt32();
                 _lengthDataReceive = _readerReceive.ReadInt32();
+                if (_lengthDataReceive < 0)
+                {
+                    _loger.Write("Receive _lengthDataReceive < 0");
+                    Disconnect();
+                    return;
+                }
 
                 TruncateMemoryStreamFromTop(_msReceive, 8); // this is (4 byte command + 4 byte length)
 
@@ -144,17 +166,18 @@ namespace server
 
             if (_statusReceive == TStatusSocket.none) // All received
             {
+                _msReceive.Position = 0;
                 switch (_commandReceive)
                 {
                     case commands.sendString:
-
-                        _msReceive.Position = 0;
                         string str = Encoding.Unicode.GetString(_readerReceive.ReadBytes(_lengthDataReceive));
                         _loger.Write("str " + str);
 
                         //_loger.Write("Length _MS before " + _msReceive.Length.ToString());
                         TruncateMemoryStreamFromTop(_msReceive, (int)_msReceive.Position);
                         //_loger.Write("Length _MS after " + _msReceive.Length.ToString());
+
+                        sendStringAll(str, this);
 
                         break;
                     case commands.sendFile:
@@ -171,6 +194,11 @@ namespace server
 
             // receive continue
             BeginReceive();
+        }
+
+        public void Disconnect()
+        {
+            _socket.Disconnect(true);
         }
     }
 
@@ -204,7 +232,7 @@ namespace server
         private void AcceptCallBack(IAsyncResult ar)
         {
             loger.Write("Connect new client");
-            TClientSocket clientSocket = new TClientSocket(serverSocket.EndAccept(ar), this.SendStringAll, loger);
+            TClientSocket clientSocket = new TClientSocket(serverSocket.EndAccept(ar), new SendStringAll(SendStringAll), loger);
             ClientList.Add(clientSocket);
             BeginAccept();
         }
@@ -214,17 +242,15 @@ namespace server
             bool flag;
             foreach (TClientSocket item in ClientList)
             {
+                // exclude socket
                 flag = true;
-                if (item != null)
-                {
-                    if (item != excludeSocket)
-                    {
+                if (excludeSocket != null)
+                    if (item == excludeSocket)
                         flag = false;
-                    }
-                }
-                if (flag) {
+
+                if (flag) 
                     item.SendString(str);
-                }
+                
             }
         }
     }

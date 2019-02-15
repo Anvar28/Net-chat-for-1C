@@ -6,10 +6,6 @@ using System.Threading.Tasks;
 
 namespace server
 {
-    public class constants
-    {
-        public static string separator = "#";
-    }    
 
     public enum commands
     {
