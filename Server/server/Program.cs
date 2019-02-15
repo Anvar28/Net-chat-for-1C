@@ -214,13 +214,14 @@ namespace server
 
             ClientList = new List<TClientSocket>();
 
-            serverSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             serverSocket.Bind(new IPEndPoint(IPAddress.Any, port));
             serverSocket.Listen(0);
         }
 
         public void Start()
         {
+            loger.Write("Start server");
             BeginAccept();
         }
 
@@ -255,6 +256,44 @@ namespace server
         }
     }
 
+    class THttpServer
+    {
+
+        private HttpListener _httpServer;
+        private ILoger loger;
+
+        public THttpServer(int port, ILoger lLoger)
+        {
+            loger = lLoger;
+            _httpServer = new HttpListener();
+            _httpServer.Prefixes.Add("http://*:" + port + "/");            
+        }
+
+        public void Start()
+        {
+            _httpServer.Start();
+            loger.Write("Start http server");      
+            Thread requestListener = new Thread(() =>
+            {
+                while (true)
+                {
+                    loger.Write("Жддем данные");
+                    HttpListenerContext context = _httpServer.GetContext();
+                    HttpListenerRequest request = context.Request;
+                    HttpListenerResponse response = context.Response;
+                    loger.Write(request.ToString());
+                    string responseString = "<HTML><BODY> Hello world!</BODY></HTML>";
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
+                    response.ContentLength64 = buffer.Length;
+                    System.IO.Stream output = response.OutputStream;
+                    output.Write(buffer, 0, buffer.Length);
+                    output.Close();
+                }
+            });
+            requestListener.Start();
+        }
+    }
+
     class Program
     {
         const int port = 5050; // порт для прослушивания подключений
@@ -262,9 +301,14 @@ namespace server
         static void Main(string[] args)
         {
             logConsol loger = new logConsol();
-            loger.Write("Start");
+            loger.Write("Start app");
+
             TServer server = new TServer(port, loger);
             server.Start();
+
+            THttpServer httpServer = new THttpServer(8080, loger);
+            httpServer.Start();
+
             Console.ReadLine();
         }
     }
