@@ -3,21 +3,69 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
         xmlns:local="clr-namespace:client"
         mc:Ignorable="d"
-        Title="Клиент" Height="373" Width="605.208" Closing="Window_Closing">
-    <Grid Margin="0,0,0,0">
-        <Canvas Margin="10,10,432,388" Grid.Row="1">
-            <Label Content="IP" HorizontalAlignment="Left" VerticalAlignment="Top" IsTabStop="True"/>
-            <TextBox x:Name="edtIP" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="127.0.0.1" VerticalAlignment="Top" Width="120" Canvas.Left="25"/>
-            <TextBox x:Name="edtPort" Height="23" Canvas.Left="150" TextWrapping="Wrap" Text="5050" Width="120"/>
-            <TextBox x:Name="btnName" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Canvas.Left="275"/>
-            <Button x:Name="btnDisconnect" Content="Отключится" HorizontalAlignment="Left" VerticalAlignment="Top" Width="74" Canvas.Left="435" Click="btnDisconnect_Click"/>
-            <Button x:Name="btnConnect" Content="Соединиться" Canvas.Left="355" Width="75" Click="btnConnect_Click"/>
-        </Canvas>
-        <ListBox x:Name="lbLog" Margin="10,40,10,28"/>
-        <TextBox x:Name="edtText" HorizontalAlignment="Left" Height="23" Margin="90,0,0,0" TextWrapping="Wrap" VerticalAlignment="Bottom" Width="417" KeyDown="edtText_KeyDown"/>
-        <Button x:Name="btnSend" Content="Отправить" HorizontalAlignment="Left" Margin="512,0,0,3" VerticalAlignment="Bottom" Width="75" Click="btnSend_Click"/>
-        <TextBox x:Name="edtTo" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" VerticalAlignment="Bottom" Width="75" Margin="10,0,0,0"/>
+        Title="Клиент" Height="373" Width="605.208" Closing="Window_Closing" Loaded="Window_Loaded">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="45"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="45"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.Background>
+            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                <GradientStop Color="#FF85AEF7" Offset="1"/>
+                <GradientStop Color="#FFD8D9FD"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+        <Image x:Name="imgConnect" HorizontalAlignment="Left" Height="25" Margin="10,10,0,0" VerticalAlignment="Top" Width="25" Source="Resources/BallRed.png" Stretch="Fill" Grid.Row="0" Grid.Column="0"/>
+        <ToolBar x:Name="tbButton" Margin="10,10,10,0" Background="{x:Null}" Foreground="{x:Null}" Grid.Column="1" Height="30" VerticalAlignment="Top">
+            <RadioButton x:Name="btnChat" Content="Чат" MinWidth="100" FontSize="14" Checked="btn_Checked"/>
+            <RadioButton x:Name="btnLogs" Content="Логи" MinWidth="100" FontSize="14" Checked="btn_Checked"/>
+            <RadioButton x:Name="btnProperties" Content="Наcтройки" MinWidth="100" FontSize="14" Checked="btn_Checked"/>
+        </ToolBar>
+        <Grid Grid.ColumnSpan="2" Grid.Row="2" Grid.Column="0" Margin="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0*"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Canvas x:Name="layProperty" Margin="0,0,0,0" Grid.ColumnSpan="2">
+                <Label Content="IP:" VerticalAlignment="Top" IsTabStop="True" Canvas.Left="10" Canvas.Top="1" Width="47" HorizontalAlignment="Right" HorizontalContentAlignment="Right" FontSize="13"/>
+                <TextBox x:Name="edtIP" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="127.0.0.1" VerticalAlignment="Top" Width="120" Canvas.Left="62" FontSize="13"/>
+                <TextBox x:Name="edtPort" Height="23" Canvas.Left="62" TextWrapping="Wrap" Text="5050" Width="120" Canvas.Top="29" FontSize="13"/>
+                <TextBox x:Name="btnName" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Canvas.Left="62" Canvas.Top="57" FontSize="13"/>
+                <Button x:Name="btnDisconnect" Content="Отключиться" HorizontalAlignment="Left" VerticalAlignment="Top" Width="113" Canvas.Left="187" Click="btnDisconnect_Click" Canvas.Top="29" FontSize="13"/>
+                <Button x:Name="btnConnect" Content="Подключиться" Canvas.Left="187" Width="113" Click="btnConnect_Click" Canvas.Top="1" FontSize="13"/>
+                <Label Content="Port:" HorizontalAlignment="Right" VerticalAlignment="Top" IsTabStop="True" Canvas.Left="10" Canvas.Top="27" Width="47" HorizontalContentAlignment="Right" FontSize="13"/>
+                <Label Content="Name:" HorizontalAlignment="Right" VerticalAlignment="Top" IsTabStop="True" Width="47" HorizontalContentAlignment="Right" FontSize="13" Canvas.Left="10" Canvas.Top="54"/>
+            </Canvas>
+            <Grid x:Name="layLogs" Grid.ColumnSpan="2" d:IsHidden="True">
+                <ListBox x:Name="lbLog" Margin="10"/>
+            </Grid>
+            <Grid x:Name="layChat" Grid.ColumnSpan="2" d:IsHidden="True">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="70"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="90"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="edtText" TextWrapping="Wrap" KeyDown="edtText_KeyDown" Margin="10, 0, 5, 10" Grid.Row="1" Grid.Column="0"/>
+                <Button x:Name="btnSend" Content="Отправить" Click="btnSend_Click" Margin="5, 0, 10, 10" Grid.Row="1" Grid.Column="1"/>
+                <ListBox x:Name="lbChat" IsEnabled="False" Margin="10" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"/>
+            </Grid>
+        </Grid>
     </Grid>
+
+    <Window.Resources>
+        <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
+            <MenuItem Header="Open" Click="Menu_Open"/>
+            <MenuItem Header="Close" Click="Menu_Close"/>
+        </ContextMenu>
+    </Window.Resources>
 </Window>

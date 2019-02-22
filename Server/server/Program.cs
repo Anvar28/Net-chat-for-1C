@@ -12,12 +12,6 @@ namespace server
 {
     delegate void SendStringAll(string str, TClientSocket excludeSocket = null);
 
-    enum TStatusSocket
-    {
-        none,
-        receiveStream
-    }
-
     class TClientSocket
     {
         public Socket _socket;
@@ -38,7 +32,7 @@ namespace server
             _socket = lsocket;
             _statusReceive = TStatusSocket.none;
 
-            _bufReceive = new byte[10];
+            _bufReceive = new byte[1024];
             _msReceive = new MemoryStream();
             _readerReceive = new BinaryReader(_msReceive);
 
@@ -259,44 +253,99 @@ namespace server
     class THttpServer
     {
 
-        private HttpListener _httpServer;
+        private Socket _httpServer;
         private ILoger loger;
+        public SendStringAll SendStringAll;
 
         public THttpServer(int port, ILoger lLoger)
         {
             loger = lLoger;
-            _httpServer = new HttpListener();
-            _httpServer.Prefixes.Add("http://*:" + port + "/");            
+            _httpServer = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _httpServer.Bind(new IPEndPoint(IPAddress.Any, port));
+            _httpServer.Listen(0);
         }
 
         public void Start()
         {
-            _httpServer.Start();
-            loger.Write("Start http server");      
-            Thread requestListener = new Thread(() =>
+            loger.Write("Start http server");
+            BeginAccept();
+        }
+
+        private void BeginAccept()
+        {
+            _httpServer.BeginAccept(AcceptCallBack, null);
+        }
+
+        private void AcceptCallBack(IAsyncResult ar)
+        {
+            loger.Write("Connect new http client");
+            Socket clientSocket = (Socket)_httpServer.EndAccept(ar);
+            HandleTheRequest(clientSocket);
+            clientSocket.Close();
+            BeginAccept();
+        }
+
+        private void HandleTheRequest(Socket clientSocket)
+        {
+            byte[] buffer = new byte[10240]; // 10 kb
+            int receivedBCount = clientSocket.Receive(buffer);
+            string strReceived = Encoding.UTF8.GetString(buffer, 0, receivedBCount);
+
+            //loger.Write(strReceived);
+
+            //parsing 
+
+            string data = "";
+
+            try
             {
-                while (true)
-                {
-                    loger.Write("Жддем данные");
-                    HttpListenerContext context = _httpServer.GetContext();
-                    HttpListenerRequest request = context.Request;
-                    HttpListenerResponse response = context.Response;
-                    loger.Write(request.ToString());
-                    string responseString = "<HTML><BODY> Hello world!</BODY></HTML>";
-                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
-                    response.ContentLength64 = buffer.Length;
-                    System.IO.Stream output = response.OutputStream;
-                    output.Write(buffer, 0, buffer.Length);
-                    output.Close();
-                }
-            });
-            requestListener.Start();
+                string httpMethod = strReceived.Substring(0, strReceived.IndexOf(" "));
+
+                int start = strReceived.IndexOf("\r\n\r\n") + 4;
+                int length = strReceived.Length - start;
+                data = strReceived.Substring(start, length);
+
+                loger.Write("Данные " + data);
+
+                SendResponse(clientSocket, "OK");
+            }
+            catch (Exception e)
+            {
+                loger.Write("Error parse receive https server: " + e.Message + "\r\n" + strReceived);
+            }
+
+            SendStringAll(data);
+
+        }
+
+        private void SendResponse(Socket clientSocket, string strContent, string responseCode = "200 OK", string contentType = "text/html")
+        {
+            byte[] bContent = Encoding.UTF8.GetBytes(strContent);
+            SendResponse(clientSocket, bContent, responseCode, contentType);
+        }
+
+        private void SendResponse(Socket clientSocket, byte[] bContent, string responseCode, string contentType)
+        {
+            try
+            {
+                byte[] bHeader = Encoding.ASCII.GetBytes(
+                                    "HTTP/1.1 " + responseCode + "\r\n"
+                                  + "Server: Atasoy Simple Web Server\r\n"
+                                  + "Content-Length: " + bContent.Length.ToString() + "\r\n"
+                                  + "Connection: close\r\n"
+                                  + "Content-Type: " + contentType + "\r\n\r\n");
+                clientSocket.Send(bHeader);
+                clientSocket.Send(bContent);
+                clientSocket.Close();
+            }
+            catch { }
         }
     }
 
     class Program
     {
         const int port = 5050; // порт для прослушивания подключений
+        const int portHttp = 8080; // порт для http
 
         static void Main(string[] args)
         {
@@ -306,7 +355,8 @@ namespace server
             TServer server = new TServer(port, loger);
             server.Start();
 
-            THttpServer httpServer = new THttpServer(8080, loger);
+            THttpServer httpServer = new THttpServer(portHttp, loger);
+            httpServer.SendStringAll = server.SendStringAll;
             httpServer.Start();
 
             Console.ReadLine();

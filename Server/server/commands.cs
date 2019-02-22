@@ -12,4 +12,9 @@ namespace server
         sendFile = 2
     }
 
+    enum TStatusSocket
+    {
+        none,
+        receiveStream
+    }
 }

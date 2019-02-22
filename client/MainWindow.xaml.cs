@@ -16,6 +16,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
+using WinForms = System.Windows.Forms;
 
 namespace client
 {
@@ -23,6 +25,7 @@ namespace client
     delegate void OnReceive(string str);
     delegate void Log(string str);
     delegate void OnAction(TClient client);
+    delegate void OnError(TClient client, Exception e);
 
     enum TStatusSocket
     {
@@ -48,6 +51,7 @@ namespace client
 
         public OnAction OnConnect;
         public OnAction OnDisconnect;
+        public OnError OnError;
         public OnReceive OnReceive;
 
         public bool Connected
@@ -79,12 +83,17 @@ namespace client
 
         private void _OnDisconnect()
         {
-            OnDisconnect(this);
+            OnDisconnect?.Invoke(this);
         }
 
         private void _OnConnect()
         {
-            OnConnect(this);
+            OnConnect?.Invoke(this);
+        }
+
+        private void _OnError(Exception e)
+        {
+            OnError?.Invoke(this, e);
         }
 
         private void _OnReceive(string str)
@@ -109,12 +118,13 @@ namespace client
             catch (Exception e)
             {
                 _Log("Error connect " + e.Message);
+                _OnError(e);
             }
 
             if (_socket.Connected)
             {
-                _OnConnect();
                 _Log("Connect to " + _socket.RemoteEndPoint.ToString());
+                _OnConnect();
                 _statusReceive = TStatusSocket.none;
                 BeginReceive();
             }
@@ -152,9 +162,10 @@ namespace client
                 {
                     _socket.Send(ms.ToArray());
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
                     _Log("Error send data");
+                    _OnError(e);
                 }
         }
 
@@ -167,9 +178,10 @@ namespace client
             {
                 _socket.BeginReceive(_bufReceive, 0, _bufReceive.Length, SocketFlags.None, RecieveCallBack, null);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 Disconnect();
+                _OnError(e);
             }
         }
 
@@ -188,17 +200,18 @@ namespace client
                 // Receive data
                 bufLen = _socket.EndReceive(result);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                Disconnect();
                 _Log("Connect close");
+                _OnError(e);
+                Disconnect();
                 return;
             }
 
             if (bufLen == 0)
             {
-                Disconnect();
                 _Log("Connect close");
+                Disconnect();
                 return;
             }
 
@@ -206,7 +219,7 @@ namespace client
             _msReceive.Write(_bufReceive, 0, bufLen);
 
             // processing data
-            //_loger.Write("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
+            _Log("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
 
             // analys head 
 
@@ -246,8 +259,9 @@ namespace client
                         string str = Encoding.Unicode.GetString(_msReceive.ToArray());
                         _Log("str " + str);
 
-                        TruncateMemoryStreamFromTop(_msReceive, (int)_msReceive.Position);
                         _OnReceive(str);
+
+                        TruncateMemoryStreamFromTop(_msReceive, (int)_msReceive.Position);
 
                         break;
                     case server.commands.sendFile:
@@ -273,37 +287,112 @@ namespace client
     /// </summary>
     public partial class MainWindow : Window
     {
-        private TClient client;
+        public const string strConnect = "Соединение установлено";
+        public const string strDisconnect = "Соединение прекращено";
+        public const int ReconectSecond = 10;
+
+        private TClient _client;
+        private WinForms.NotifyIcon _notifier = new WinForms.NotifyIcon();
+        private DispatcherTimer _Timer;
+        private bool Reconnect = true;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            client = new TClient();
-            client.OnConnect = OnConnect;
-            client.OnDisconnect = OnDisconnect;
-            client.OnReceive = OnReceive;
-            client.log = new Log(log);
+            _client = new TClient();
+            _client.OnConnect = OnConnect;
+            _client.OnDisconnect = OnDisconnect;
+            _client.OnReceive = OnReceive;
+            _client.OnError = OnError;
+            _client.log = new Log(Log);
+
+            this._notifier.MouseDown += new WinForms.MouseEventHandler(notifier_MouseDown);
+            this._notifier.Icon = Properties.Resources.TrayIcon;
+            this._notifier.Visible = true;
+        }
+
+        public void ShowBalloon(string text, int second = 3, string title="", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
+        {
+            if (title == "")
+                title = "Звонок";
+            _notifier.ShowBalloonTip(second * 1000, title, text, icon);
+        }
+
+        void notifier_MouseDown(object sender, WinForms.MouseEventArgs e)
+        {
+            if (e.Button == WinForms.MouseButtons.Right)
+            {
+                ContextMenu menu = (ContextMenu)this.FindResource("NotifierContextMenu");
+                menu.IsOpen = true;            
+            }
+        }
+
+        private void Menu_Open(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Open");
+        }
+
+        private void Menu_Close(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Close");
         }
 
         private void OnConnect(TClient client)
         {
-            log("Соединение установлено");
-            setStatusControl();
+            SetStatusControl();
+            Log(strConnect);
+            ShowBalloon(strConnect);
         }
 
         private void OnDisconnect(TClient client)
         {
-            log("Связь потеряна");
-            setStatusControl();
+            Log(strDisconnect);
+            SetStatusControl();
+            ShowBalloon(strDisconnect);
         }
 
         private void OnReceive(string str)
         {
-            log(str);
+            WriteMessageChat(str);
+            ShowBalloon(str);
         }
 
-        private void log(string str)
+        private void OnError(TClient client, Exception e)
+        {
+            Log(e.Message);
+            if (!client.Connected && Reconnect)
+            {
+                // Запуск коннекта через N секунд
+                StartReconnect();
+            }
+        }
+
+        private void StartReconnect()
+        {
+            this.Dispatcher.Invoke(
+                delegate
+                {
+                    Log("Попытка подключения через " + ReconectSecond.ToString()+" секунд.");
+                    if (_Timer == null)
+                    {
+                        _Timer = new DispatcherTimer();
+                    }
+
+                    _Timer.Tick += new EventHandler(StartReconnectCallback);
+                    _Timer.Interval = new TimeSpan(0, 0, ReconectSecond);
+                    _Timer.Start();
+                }
+            );
+        }
+
+        private void StartReconnectCallback(object sender, EventArgs e)
+        {
+            _Timer.Stop();
+            Connect();
+        }
+
+        private void Log(string str)
         {
             // Update data on the form
             this.Dispatcher.Invoke(
@@ -314,43 +403,69 @@ namespace client
             );
         }
 
-        private void sendTextAndClear()
-        {
-            client.SendString(edtText.Text);
-            edtText.Text = "";
-        }
-
-        private void btnConnect_Click(object sender, RoutedEventArgs e)
-        {
-
-            if (!client.Connected)
-            {
-                log("Попытка подключение к " + edtIP.Text + ":" + edtPort.Text);
-                int port = 20500;
-                int.TryParse(edtPort.Text, out port);
-                client.Connect(edtIP.Text, port);
-            }
-        }
-
-        private void setStatusControl()
+        private void WriteMessageChat(string str)
         {
             // Update data on the form
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    btnConnect.IsEnabled = !client.Connected;
+                    lbChat.Items.Insert(0, DateTime.Now.ToString() + "\t" + str);
+                }
+            );
+        }
+
+        private void sendTextAndClear()
+        {
+            _client.SendString(edtText.Text);
+            edtText.Text = "";
+        }
+
+        public void Connect()
+        {
+            if (!_client.Connected)
+            {
+                Log("Попытка подключение к " + edtIP.Text + ":" + edtPort.Text);
+                int port = 20500;
+                int.TryParse(edtPort.Text, out port);
+                _client.Connect(edtIP.Text, port);
+            }
+        }
+
+        private void btnConnect_Click(object sender, RoutedEventArgs e)
+        {
+            Reconnect = true;
+            Connect();
+        }
+
+        private void SetStatusControl()
+        {
+            // Update data on the form
+            this.Dispatcher.Invoke(
+                delegate
+                {
+                    btnConnect.IsEnabled = !_client.Connected;
                     btnDisconnect.IsEnabled = !btnConnect.IsEnabled;
                     btnSend.IsEnabled = btnDisconnect.IsEnabled;
+
+                    string imgBall = "Resources/BallRed.png";
+                    if (_client.Connected)
+                    {
+                        imgBall = "Resources/BallGreen.png";
+                    }
+                    imgConnect.Source = new BitmapImage(new Uri(imgBall, UriKind.Relative));
                 }
             );
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (client.Connected)
+            if (_client.Connected)
             {
-                client.Disconnect();
+                _client.Disconnect();
             }
+
+            _notifier.Visible = false;
+            _notifier.Dispose();
         }
 
         private void btnSend_Click(object sender, RoutedEventArgs e)
@@ -368,7 +483,44 @@ namespace client
 
         private void btnDisconnect_Click(object sender, RoutedEventArgs e)
         {
-            client.Disconnect();
+            Reconnect = false;
+            _client.Disconnect();
+        }
+
+        public void setVisibleLayer(RadioButton btn)
+        {
+            if (btn == btnChat)
+            {
+                layChat.Visibility = Visibility.Visible;
+                layLogs.Visibility = Visibility.Hidden;
+                layProperty.Visibility = Visibility.Hidden;
+            }
+            else if (btn == btnLogs)
+            {
+                layChat.Visibility = Visibility.Hidden;
+                layLogs.Visibility = Visibility.Visible;
+                layProperty.Visibility = Visibility.Hidden;
+            }
+            else if (btn == btnProperties)
+            {
+                layChat.Visibility = Visibility.Hidden;
+                layLogs.Visibility = Visibility.Hidden;
+                layProperty.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void btn_Checked(object sender, RoutedEventArgs e)
+        {
+            setVisibleLayer((RadioButton)sender);
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            btnChat.IsChecked = true;
+            if (edtIP.Text != "")
+            {
+                Connect();
+            }
         }
     }
 }
