@@ -27,14 +27,32 @@ namespace client
     /// </summary>
     public partial class MainWindow : Window
     {
+
+        // Строковые константы
+
         public const string strConnect = "Соединение установлено";
         public const string strDisconnect = "Соединение прекращено";
+
+        // 
+
         public const int ReconectSecond = 10;
+
+        // Данные для ини файла
+
+        string iniFile = "param.ini";
+        string iniSection = "main";
+        string iniIP = "ip";
+        string iniPort = "port";
+        string iniName = "name";
+
+        // Данные класса
 
         private TClientSocket _client;
         private WinForms.NotifyIcon _notifier = new WinForms.NotifyIcon();
         private DispatcherTimer _Timer;
         private bool Reconnect = true;
+
+        // Методы
 
         public MainWindow()
         {
@@ -118,10 +136,12 @@ namespace client
                     {
                         _Timer = new DispatcherTimer();
                     }
-
-                    _Timer.Tick += new EventHandler(StartReconnectCallback);
-                    _Timer.Interval = new TimeSpan(0, 0, ReconectSecond);
-                    _Timer.Start();
+                    if (!_Timer.IsEnabled)
+                    {
+                        _Timer.Tick += new EventHandler(StartReconnectCallback);
+                        _Timer.Interval = new TimeSpan(0, 0, ReconectSecond);
+                        _Timer.Start();
+                    }
                 }
             );
         }
@@ -165,7 +185,7 @@ namespace client
             if (!_client.Connected)
             {
                 Log("Попытка подключение к " + edtIP.Text + ":" + edtPort.Text);
-                int port = 20500;
+                int port = 5050;
                 int.TryParse(edtPort.Text, out port);
                 _client.Connect(edtIP.Text, port);
             }
@@ -206,6 +226,8 @@ namespace client
 
             _notifier.Visible = false;
             _notifier.Dispose();
+
+            PropertySave();
         }
 
         private void btnSend_Click(object sender, RoutedEventArgs e)
@@ -256,11 +278,29 @@ namespace client
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            PropertyLoad();
+
             btnChat.IsChecked = true;
             if (edtIP.Text != "")
             {
                 Connect();
             }
+        }
+
+        private void PropertyLoad()
+        {
+            IniFiles ini = new IniFiles(iniFile);
+            edtIP.Text = ini.Read(iniSection, iniIP);
+            edtPort.Text = ini.Read(iniSection, iniPort);
+            edtName.Text = ini.Read(iniSection, iniName);
+        }
+
+        private void PropertySave()
+        {
+            IniFiles ini = new IniFiles(iniFile);
+            ini.Write(iniSection, iniIP, edtIP.Text);
+            ini.Write(iniSection, iniPort, edtPort.Text);
+            ini.Write(iniSection, iniName, edtName.Text);
         }
     }
 }

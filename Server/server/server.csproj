@@ -44,6 +44,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\IniFiles.cs" />
     <Compile Include="Classes\TMemoryStream.cs" />
     <Compile Include="Classes\TSocket.cs" />
     <Compile Include="commands.cs" />

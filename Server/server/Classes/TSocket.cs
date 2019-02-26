@@ -237,7 +237,26 @@ namespace server.Classes
         public void Connect(string ip, int port)
         {
             _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp); // Create new connection
-            _socket.BeginConnect(IPAddress.Parse(ip), port, ConnectCallBack, null);
+
+            try
+            {
+                _socket.BeginConnect(IPAddress.Parse(ip), port, ConnectCallBack, null);
+            }
+            catch (Exception e)
+            {
+                IPHostEntry a = Dns.GetHostEntry(ip);
+                if (a.AddressList.Count() > 0)
+                    try
+                    {
+                        _socket.BeginConnect(a.AddressList[0], port, ConnectCallBack, null);
+                    }
+                    catch (Exception e1)
+                    {
+                        _OnError(e1);
+                    }
+                    
+            }
+
         }
 
         private void ConnectCallBack(IAsyncResult result)
