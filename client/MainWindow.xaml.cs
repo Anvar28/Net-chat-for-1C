@@ -18,297 +18,10 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using WinForms = System.Windows.Forms;
+using server.Classes;
 
 namespace client
 {
-
-    delegate void OnReceive(string str);
-    delegate void OnLog(string str);
-    delegate void OnAction(TClient client);
-    delegate void OnError(TClient client, Exception e);
-
-    enum TStatusSocket
-    {
-        none,
-        receiveStream
-    }
-
-    class TMemoryStream
-    {
-        private MemoryStream _ms;
-
-        public MemoryStream ms { get { return _ms; } }
-        public long Length { get { return _ms.Length; } }
-        public long Position { get { return _ms.Position; }  set { _ms.Position = value; } }
-
-        public TMemoryStream()
-        {
-            _ms = new MemoryStream();
-        }
-
-        public void TruncateFromTop(int numberOfBytesToRemove)
-        {
-            byte[] buf = _ms.GetBuffer();
-            Buffer.BlockCopy(buf, numberOfBytesToRemove, buf, 0, (int)_ms.Length - numberOfBytesToRemove);
-            _ms.SetLength(_ms.Length - numberOfBytesToRemove);
-        }
-
-        public void Clear()
-        {
-            Array.Clear(_ms.GetBuffer(), 0, _ms.GetBuffer().Length);
-            _ms.Position = 0;
-        }
-
-        public void Write(byte[] buffer, int offset, int count)
-        {
-            _ms.Write(buffer, offset, count);
-        }
-
-        public byte[] ToArray()
-        {
-            return _ms.ToArray();
-        }
-    }
-
-    class TClient
-    {
-        private Socket _socket;
-        private TMemoryStream _msReceive;
-        private BinaryReader _readerReceive;
-        private byte[] _bufReceive;
-        private TStatusSocket _statusReceive;
-
-        // Events
-
-        public OnLog OnLog;
-        public OnAction OnConnect;
-        public OnAction OnDisconnect;
-        public OnError OnError;
-        public OnReceive OnReceive;
-
-        public bool Connected
-        {
-            get {
-                if (_socket == null)
-                    return false;
-                else
-                    return _socket.Connected;
-
-            }
-        }
-
-        // Constructor
-
-        public TClient()
-        {            
-            _msReceive = new TMemoryStream();
-            _readerReceive = new BinaryReader(_msReceive.ms);
-            _bufReceive = new byte[10];
-        }
-
-        // Events
-
-        private void _Log(string str)
-        {
-            OnLog?.Invoke(str);
-        }
-
-        private void _OnDisconnect()
-        {
-            OnDisconnect?.Invoke(this);
-        }
-
-        private void _OnConnect()
-        {
-            OnConnect?.Invoke(this);
-        }
-
-        private void _OnError(Exception e)
-        {
-            OnError?.Invoke(this, e);
-        }
-
-        private void _OnReceive(string str)
-        {
-            OnReceive(str);
-        }
-
-        // Connect
-
-        public void Connect(string ip, int port)
-        {
-            _socket = new Socket(SocketType.Stream, ProtocolType.Tcp); // Create new connection
-            _socket.BeginConnect(IPAddress.Parse(ip), port, ConnectCallBack, null);
-        }
-
-        private void ConnectCallBack(IAsyncResult result)
-        {
-            try
-            {
-                _socket.EndConnect(result);
-            }
-            catch (Exception e)
-            {
-                _Log("Error connect " + e.Message);
-                _OnError(e);
-            }
-
-            if (_socket.Connected)
-            {
-                _Log("Connect to " + _socket.RemoteEndPoint.ToString());
-                _OnConnect();
-                _statusReceive = TStatusSocket.none;
-                BeginReceive();
-            }
-        }
-    
-        // Disconnect
-
-        public void Disconnect()
-        {
-            if (_socket.Connected)
-            {
-                _socket.Shutdown(SocketShutdown.Send);
-                _socket.Close();
-            }            
-            _OnDisconnect();
-        }
-
-        // Send
-
-        public void SendString(string str)
-        {
-            MemoryStream ms = new MemoryStream();
-            BinaryWriter writer = new BinaryWriter(ms);
-            writer.Write((Int32)server.commands.sendString);
-            byte[] _bufData = Encoding.Unicode.GetBytes(str);
-            writer.Write((Int32)_bufData.Length);
-            writer.Write(_bufData);
-            Send(ms);
-        }
-
-        private void Send(MemoryStream ms)
-        {
-            if (_socket.Connected)
-                try
-                {
-                    _socket.Send(ms.ToArray());
-                }
-                catch (Exception e)
-                {
-                    _Log("Error send data");
-                    _OnError(e);
-                }
-        }
-
-        // Receive
-
-        private void BeginReceive()
-        {
-            Array.Clear(_bufReceive, 0, _bufReceive.Length);
-            try
-            {
-                _socket.BeginReceive(_bufReceive, 0, _bufReceive.Length, SocketFlags.None, RecieveCallBack, null);
-            }
-            catch (Exception e)
-            {
-                Disconnect();
-                _OnError(e);
-            }
-        }
-
-        private TStatusSocket ProcessingData()
-        {
-            const int lengthHead = 8;
-
-            while (_msReceive.Length > 0)
-            {
-                _msReceive.Position = 0;
-
-                // read command and length 
-
-                if (_msReceive.Length < lengthHead)
-                    return TStatusSocket.receiveStream;
-
-                server.commands commandReceive = (server.commands)_readerReceive.ReadInt32();
-                int lengthDataReceive = _readerReceive.ReadInt32();
-
-                // not complyte receive
-
-                if (_msReceive.Length < lengthDataReceive + lengthHead)    
-                    return TStatusSocket.receiveStream;
-
-                // all received
-
-                if (_msReceive.Length >= lengthDataReceive + lengthHead)   
-                {
-                    _msReceive.Position = lengthHead;
-                    switch (commandReceive)
-                    {
-                        case server.commands.sendString:
-                            byte[] buf = new byte[lengthDataReceive];
-                            _msReceive.ms.Read(buf, 0, lengthDataReceive);
-                            string str = Encoding.Unicode.GetString(buf);
-                            _Log("str " + str);
-
-                            _OnReceive(str);
-                            _msReceive.TruncateFromTop(lengthDataReceive + lengthHead);
-
-                            break;
-                        case server.commands.sendFile:
-
-                            _OnError(new Exception("File receive not complit"));
-                            _msReceive.Clear();
-
-                            break;
-                        default:
-
-                            _msReceive.Clear();
-
-                            break;
-                    }
-                }
-            }
-            return TStatusSocket.none;
-        }
-
-        public void RecieveCallBack(IAsyncResult result)
-        {
-            int bufLen = 0;
-            try
-            {
-                // Receive data
-                bufLen = _socket.EndReceive(result);
-            }
-            catch (Exception e)
-            {
-                _Log("Connect close error: "+e.Message);
-                _OnError(e);
-                Disconnect();
-                return;
-            }
-
-            if (bufLen == 0)
-            {
-                _Log("Connect close bufLen = 0");
-                Disconnect();
-                return;
-            }
-
-            // copy data to memory
-            _msReceive.Position = _msReceive.Length;
-            _msReceive.Write(_bufReceive, 0, bufLen);
-
-            // processing data
-            _Log("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
-            _statusReceive = ProcessingData();
-
-            // receive continue
-            BeginReceive();
-        }
-
-    }
-
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -318,7 +31,7 @@ namespace client
         public const string strDisconnect = "Соединение прекращено";
         public const int ReconectSecond = 10;
 
-        private TClient _client;
+        private TClientSocket _client;
         private WinForms.NotifyIcon _notifier = new WinForms.NotifyIcon();
         private DispatcherTimer _Timer;
         private bool Reconnect = true;
@@ -327,7 +40,7 @@ namespace client
         {
             InitializeComponent();
 
-            _client = new TClient();
+            _client = new TClientSocket();
             _client.OnConnect = OnConnect;
             _client.OnDisconnect = OnDisconnect;
             _client.OnReceive = OnReceive;
@@ -365,27 +78,27 @@ namespace client
             MessageBox.Show("Close");
         }
 
-        private void OnConnect(TClient client)
+        private void OnConnect(TSocket client)
         {
             SetStatusControl();
             Log(strConnect);
             ShowBalloon(strConnect);
         }
 
-        private void OnDisconnect(TClient client)
+        private void OnDisconnect(TSocket client)
         {
             Log(strDisconnect);
             SetStatusControl();
             ShowBalloon(strDisconnect);
         }
 
-        private void OnReceive(string str)
+        private void OnReceive(TSocket client, string str)
         {
             WriteMessageChat(str);
             ShowBalloon(str);
         }
 
-        private void OnError(TClient client, Exception e)
+        private void OnError(TSocket client, Exception e)
         {
             Log(e.Message);
             if (!client.Connected && Reconnect)

@@ -7,206 +7,23 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using logers;
+using server.Classes;
 
 namespace server
 {
-    delegate void SendStringAll(string str, TClientSocket excludeSocket = null);
-
-    class TClientSocket
-    {
-        public Socket _socket;
-        private MemoryStream _msReceive;
-        private BinaryReader _readerReceive;
-        private byte[] _bufReceive;
-        private server.commands _commandReceive;
-        private TStatusSocket _statusReceive;
-        private int _lengthDataReceive;
-
-        public string name;
-        private SendStringAll sendStringAll;
-        private ILoger _loger;
-
-        public TClientSocket(Socket lsocket, SendStringAll lSendStringAll, ILoger loger)
-        {
-            _loger = loger;
-            _socket = lsocket;
-            _statusReceive = TStatusSocket.none;
-
-            _bufReceive = new byte[1024];
-            _msReceive = new MemoryStream();
-            _readerReceive = new BinaryReader(_msReceive);
-
-            sendStringAll = lSendStringAll;
-
-            BeginReceive();
-        }
-
-        private void ClearBuff()
-        {
-            Array.Clear(_msReceive.GetBuffer(), 0, _msReceive.GetBuffer().Length);
-            _msReceive.Position = 0;
-        }
-
-        public void SendString(string str)
-        {
-            MemoryStream ms = new MemoryStream();
-            BinaryWriter writer = new BinaryWriter(ms);
-            writer.Write((Int32)server.commands.sendString);
-            byte[] _bufData = Encoding.Unicode.GetBytes(str);
-            writer.Write((Int32)_bufData.Length);
-            writer.Write(_bufData);
-            Send(ms);
-        }
-
-        private void Send(MemoryStream ms)
-        {
-            try
-            {
-                _socket.Send(ms.ToArray());
-            }
-            catch (Exception)
-            {
-                _loger.Write("Ошибка отправки данных");
-            }
-        }
-
-        public void Close()
-        {
-            //socket.Disconnect(true);
-        }
-
-        private void BeginReceive()
-        {
-            Array.Clear(_bufReceive, 0, _bufReceive.Length);
-            try
-            {
-                _socket.BeginReceive(_bufReceive, 0, _bufReceive.Length, SocketFlags.None, RecieveCallBack, null);
-            }
-            catch (Exception)
-            {
-                _loger.Write("Connect close");
-            }
-        }
-
-        private void TruncateMemoryStreamFromTop(MemoryStream ms, int numberOfBytesToRemove)
-        {
-            byte[] buf = ms.GetBuffer();
-            Buffer.BlockCopy(buf, numberOfBytesToRemove, buf, 0, (int)ms.Length - numberOfBytesToRemove);
-            ms.SetLength(ms.Length - numberOfBytesToRemove);
-        }
-
-        public void RecieveCallBack(IAsyncResult result)
-        {
-            int bufLen = 0;
-            try
-            {
-                // Receive data
-                bufLen = _socket.EndReceive(result);
-            }
-            catch (Exception)
-            {
-                _loger.Write("Connect close");
-                Disconnect();
-                return;
-            }            
-
-            if (bufLen == 0)
-            {
-                _loger.Write("Receive bufLen = 0");
-                Disconnect();
-                return;
-            }
-
-            // copy data to memory
-            _msReceive.Write(_bufReceive, 0, bufLen);
-
-            // processing data
-            _loger.Write("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
-
-            // analys head 
-
-            if (_statusReceive == TStatusSocket.none)
-            {
-                _msReceive.Position = 0;
-
-                // read command and length 
-                _commandReceive = (server.commands)_readerReceive.ReadInt32();
-                _lengthDataReceive = _readerReceive.ReadInt32();
-                if (_lengthDataReceive < 0)
-                {
-                    _loger.Write("Receive _lengthDataReceive < 0");
-                    Disconnect();
-                    return;
-                }
-
-                TruncateMemoryStreamFromTop(_msReceive, 8); // this is (4 byte command + 4 byte length)
-
-                if (_msReceive.Length < _lengthDataReceive)
-                {
-                    _statusReceive = TStatusSocket.receiveStream;
-                    _msReceive.Position = _msReceive.Length;
-                }                
-            }
-            
-            // if not complyte receive
-
-            else
-            {
-                if (_msReceive.Length >= _lengthDataReceive)
-                {
-                    _statusReceive = TStatusSocket.none;
-                }
-            }
-
-            if (_statusReceive == TStatusSocket.none) // All received
-            {
-                _msReceive.Position = 0;
-                switch (_commandReceive)
-                {
-                    case commands.sendString:
-                        string str = Encoding.Unicode.GetString(_readerReceive.ReadBytes(_lengthDataReceive));
-                        _loger.Write("str " + str);
-
-                        //_loger.Write("Length _MS before " + _msReceive.Length.ToString());
-                        TruncateMemoryStreamFromTop(_msReceive, (int)_msReceive.Position);
-                        //_loger.Write("Length _MS after " + _msReceive.Length.ToString());
-
-                        sendStringAll(str, this);
-
-                        break;
-                    case commands.sendFile:
-
-                        new Exception("File receive not complit");
-
-                        break;
-                    default:
-                        break;
-                }
-
-                _msReceive.Position = 0;
-            }
-
-            // receive continue
-            BeginReceive();
-        }
-
-        public void Disconnect()
-        {
-            _socket.Disconnect(true);
-        }
-    }
+    delegate void SendStringAll(string str, TServerClientSocket excludeSocket = null);
 
     class TServer
     {
         private ILoger loger;
         private Socket serverSocket;
-        private List<TClientSocket> ClientList;
+        private List<TServerClientSocket> ClientList;
 
         public TServer(int port, ILoger lLoger)
         {
             loger = lLoger;
 
-            ClientList = new List<TClientSocket>();
+            ClientList = new List<TServerClientSocket>();
 
             serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             serverSocket.Bind(new IPEndPoint(IPAddress.Any, port));
@@ -219,23 +36,50 @@ namespace server
             BeginAccept();
         }
 
+        public void Log(string str)
+        {
+            loger.Write(str);
+        }
+
         private void BeginAccept()
         {
             serverSocket.BeginAccept(AcceptCallBack, null);
         }
-        
+
+        private void DisconnectClient(TSocket client)
+        {
+            ClientList.Remove((TServerClientSocket)client);
+            Log("Client disconnect. Count client "+ClientList.Count.ToString());
+        }
+
+        private void ReceiveClient(TSocket client, string str)
+        {
+            TServerClientSocket c = (TServerClientSocket)client;
+            SendStringAll(str, c);
+        }
+
+        private void ErrorClient(TSocket client, Exception e)
+        {
+            Log(e.Message);
+        }
+
         private void AcceptCallBack(IAsyncResult ar)
         {
             loger.Write("Connect new client");
-            TClientSocket clientSocket = new TClientSocket(serverSocket.EndAccept(ar), new SendStringAll(SendStringAll), loger);
+            TServerClientSocket clientSocket = new TServerClientSocket(serverSocket.EndAccept(ar));
+            clientSocket.OnLog = Log;
+            clientSocket.OnDisconnect = DisconnectClient;
+            clientSocket.OnReceive = ReceiveClient;
+            clientSocket.OnError = ErrorClient;
+            clientSocket.BeginReceive();
             ClientList.Add(clientSocket);
             BeginAccept();
         }
 
-        public void SendStringAll(string str, TClientSocket excludeSocket = null)
+        public void SendStringAll(string str, TServerClientSocket excludeSocket = null)
         {
             bool flag;
-            foreach (TClientSocket item in ClientList)
+            foreach (TServerClientSocket item in ClientList)
             {
                 // exclude socket
                 flag = true;
