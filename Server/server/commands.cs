@@ -8,7 +8,7 @@ namespace server
 
     public enum commands
     {
-        sendString = 1 ,
+        sendString = 1,
         sendFile = 2
     }
 
@@ -17,4 +17,5 @@ namespace server
         none,
         receiveStream
     }
+
 }

@@ -23,7 +23,7 @@ namespace client
 {
 
     delegate void OnReceive(string str);
-    delegate void Log(string str);
+    delegate void OnLog(string str);
     delegate void OnAction(TClient client);
     delegate void OnError(TClient client, Exception e);
 
@@ -33,22 +33,54 @@ namespace client
         receiveStream
     }
 
+    class TMemoryStream
+    {
+        private MemoryStream _ms;
+
+        public MemoryStream ms { get { return _ms; } }
+        public long Length { get { return _ms.Length; } }
+        public long Position { get { return _ms.Position; }  set { _ms.Position = value; } }
+
+        public TMemoryStream()
+        {
+            _ms = new MemoryStream();
+        }
+
+        public void TruncateFromTop(int numberOfBytesToRemove)
+        {
+            byte[] buf = _ms.GetBuffer();
+            Buffer.BlockCopy(buf, numberOfBytesToRemove, buf, 0, (int)_ms.Length - numberOfBytesToRemove);
+            _ms.SetLength(_ms.Length - numberOfBytesToRemove);
+        }
+
+        public void Clear()
+        {
+            Array.Clear(_ms.GetBuffer(), 0, _ms.GetBuffer().Length);
+            _ms.Position = 0;
+        }
+
+        public void Write(byte[] buffer, int offset, int count)
+        {
+            _ms.Write(buffer, offset, count);
+        }
+
+        public byte[] ToArray()
+        {
+            return _ms.ToArray();
+        }
+    }
+
     class TClient
     {
         private Socket _socket;
-        private MemoryStream _msReceive;
+        private TMemoryStream _msReceive;
         private BinaryReader _readerReceive;
         private byte[] _bufReceive;
         private TStatusSocket _statusReceive;
-        private server.commands _commandReceive;
-        private int _lengthDataReceive;
-
-        // 
-
-        public Log log;
 
         // Events
 
+        public OnLog OnLog;
         public OnAction OnConnect;
         public OnAction OnDisconnect;
         public OnError OnError;
@@ -69,16 +101,16 @@ namespace client
 
         public TClient()
         {            
-            _msReceive = new MemoryStream();
-            _readerReceive = new BinaryReader(_msReceive);
-            _bufReceive = new byte[1024];
+            _msReceive = new TMemoryStream();
+            _readerReceive = new BinaryReader(_msReceive.ms);
+            _bufReceive = new byte[10];
         }
 
         // Events
 
         private void _Log(string str)
         {
-            log(str);
+            OnLog?.Invoke(str);
         }
 
         private void _OnDisconnect()
@@ -185,11 +217,59 @@ namespace client
             }
         }
 
-        private void TruncateMemoryStreamFromTop(MemoryStream ms, int numberOfBytesToRemove)
+        private TStatusSocket ProcessingData()
         {
-            byte[] buf = ms.GetBuffer();
-            Buffer.BlockCopy(buf, numberOfBytesToRemove, buf, 0, (int)ms.Length - numberOfBytesToRemove);
-            ms.SetLength(ms.Length - numberOfBytesToRemove);
+            const int lengthHead = 8;
+
+            while (_msReceive.Length > 0)
+            {
+                _msReceive.Position = 0;
+
+                // read command and length 
+
+                if (_msReceive.Length < lengthHead)
+                    return TStatusSocket.receiveStream;
+
+                server.commands commandReceive = (server.commands)_readerReceive.ReadInt32();
+                int lengthDataReceive = _readerReceive.ReadInt32();
+
+                // not complyte receive
+
+                if (_msReceive.Length < lengthDataReceive + lengthHead)    
+                    return TStatusSocket.receiveStream;
+
+                // all received
+
+                if (_msReceive.Length >= lengthDataReceive + lengthHead)   
+                {
+                    _msReceive.Position = lengthHead;
+                    switch (commandReceive)
+                    {
+                        case server.commands.sendString:
+                            byte[] buf = new byte[lengthDataReceive];
+                            _msReceive.ms.Read(buf, 0, lengthDataReceive);
+                            string str = Encoding.Unicode.GetString(buf);
+                            _Log("str " + str);
+
+                            _OnReceive(str);
+                            _msReceive.TruncateFromTop(lengthDataReceive + lengthHead);
+
+                            break;
+                        case server.commands.sendFile:
+
+                            _OnError(new Exception("File receive not complit"));
+                            _msReceive.Clear();
+
+                            break;
+                        default:
+
+                            _msReceive.Clear();
+
+                            break;
+                    }
+                }
+            }
+            return TStatusSocket.none;
         }
 
         public void RecieveCallBack(IAsyncResult result)
@@ -202,7 +282,7 @@ namespace client
             }
             catch (Exception e)
             {
-                _Log("Connect close");
+                _Log("Connect close error: "+e.Message);
                 _OnError(e);
                 Disconnect();
                 return;
@@ -210,71 +290,18 @@ namespace client
 
             if (bufLen == 0)
             {
-                _Log("Connect close");
+                _Log("Connect close bufLen = 0");
                 Disconnect();
                 return;
             }
 
             // copy data to memory
+            _msReceive.Position = _msReceive.Length;
             _msReceive.Write(_bufReceive, 0, bufLen);
 
             // processing data
             _Log("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
-
-            // analys head 
-
-            if (_statusReceive == TStatusSocket.none)
-            {
-                _msReceive.Position = 0;
-
-                // read command and length 
-                _commandReceive = (server.commands)_readerReceive.ReadInt32();
-                _lengthDataReceive = _readerReceive.ReadInt32();
-
-                TruncateMemoryStreamFromTop(_msReceive, 8); // this is (4 byte command + 4 byte length)
-
-                if (_msReceive.Length < _lengthDataReceive)
-                {
-                    _statusReceive = TStatusSocket.receiveStream;
-                    _msReceive.Position = _msReceive.Length;
-                }
-            }
-
-            // if not complyte receive
-
-            else
-            {
-                if (_msReceive.Length >= _lengthDataReceive)
-                {
-                    _statusReceive = TStatusSocket.none;
-                }
-            }
-
-            if (_statusReceive == TStatusSocket.none) // All received
-            {
-                _msReceive.Position = 0;
-                switch (_commandReceive)
-                {
-                    case server.commands.sendString:
-                        string str = Encoding.Unicode.GetString(_msReceive.ToArray());
-                        _Log("str " + str);
-
-                        _OnReceive(str);
-
-                        TruncateMemoryStreamFromTop(_msReceive, (int)_msReceive.Position);
-
-                        break;
-                    case server.commands.sendFile:
-
-                        new Exception("File receive not complit");
-
-                        break;
-                    default:
-                        break;
-                }
-
-                _msReceive.Position = 0;
-            }
+            _statusReceive = ProcessingData();
 
             // receive continue
             BeginReceive();
@@ -305,7 +332,7 @@ namespace client
             _client.OnDisconnect = OnDisconnect;
             _client.OnReceive = OnReceive;
             _client.OnError = OnError;
-            _client.log = new Log(Log);
+            _client.OnLog = Log;
 
             this._notifier.MouseDown += new WinForms.MouseEventHandler(notifier_MouseDown);
             this._notifier.Icon = Properties.Resources.TrayIcon;
