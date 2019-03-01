@@ -165,22 +165,22 @@ namespace client
             );
         }
 
-        private void WriteStringChat(string str, Paragraph paragraph = null, bool bold = false)
+        private void ChatWriteStrings(string[] mStr)
         {
-            Inline i;
-            Run r = new Run(str+"\r\n");
-            i = r;
-            if (bold)
+
+            Paragraph paragraph = new Paragraph();
+            paragraph.Inlines.Add(new Bold(new Run(DateTime.Now.ToString() + "\r\n")));
+
+            foreach (string item in mStr)
             {
-                Bold b = new Bold(r);
-                i = b;
-            }            
-            if (paragraph == null)
-            {
-                paragraph = new Paragraph();
+                paragraph.Inlines.Add(new Run(item + "\r\n"));
             }
-            paragraph.Inlines.Add(i);
-            lbChat.Document.Blocks.Add(paragraph);
+
+            BlockCollection Blocks = lbChat.Document.Blocks;
+            if (Blocks.Count == 0)
+                Blocks.Add(paragraph);
+            else
+                Blocks.InsertBefore(Blocks.FirstBlock, paragraph);
         }
 
         private void WriteMessageChat(string str)
@@ -189,12 +189,7 @@ namespace client
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    Paragraph paragraph = new Paragraph();
-                    WriteStringChat(DateTime.Now.ToString(), paragraph, true);
-                    foreach (string item in SplitStringBR(str))
-                    {
-                        WriteStringChat(item, paragraph);
-                    }
+                    ChatWriteStrings(SplitStringBR(str));
                 }
             );
         }
