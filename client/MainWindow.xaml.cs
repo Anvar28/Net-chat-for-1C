@@ -18,7 +18,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using WinForms = System.Windows.Forms;
-using server.Classes;
+using ClassLibrary;
 
 namespace client
 {
@@ -102,6 +102,7 @@ namespace client
             SetStatusControl();
             Log(strConnect);
             ShowBalloon(strConnect);
+            //_client.SendString(edtName.Text);
         }
 
         private void OnDisconnect(TSocket client)

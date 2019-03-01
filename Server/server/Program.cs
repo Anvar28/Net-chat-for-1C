@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using logers;
-using server.Classes;
+using ClassLibrary;
 
 namespace server
 {

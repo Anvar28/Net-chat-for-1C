@@ -6,12 +6,18 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace server.Classes
+namespace ClassLibrary
 {
     public delegate void OnReceive(TSocket client, string str);
     public delegate void OnLog(string str);
     public delegate void OnAction(TSocket client);
     public delegate void OnError(TSocket client, Exception e);
+
+    public enum commands
+    {
+        sendString = 1,
+        sendFile = 2
+    }
 
     public enum TStatusSocket
     {
@@ -101,7 +107,7 @@ namespace server.Classes
         {
             MemoryStream ms = new MemoryStream();
             BinaryWriter writer = new BinaryWriter(ms);
-            writer.Write((Int32)server.commands.sendString);
+            writer.Write((Int32)commands.sendString);
             byte[] _bufData = Encoding.Unicode.GetBytes(str);
             writer.Write((Int32)_bufData.Length);
             writer.Write(_bufData);
@@ -151,7 +157,7 @@ namespace server.Classes
                 if (_msReceive.Length < lengthHead)
                     return TStatusSocket.receiveStream;
 
-                server.commands commandReceive = (server.commands)_readerReceive.ReadInt32();
+                commands commandReceive = (commands)_readerReceive.ReadInt32();
                 int lengthDataReceive = _readerReceive.ReadInt32();
 
                 // not complyte receive
@@ -166,7 +172,7 @@ namespace server.Classes
                     _msReceive.Position = lengthHead;
                     switch (commandReceive)
                     {
-                        case server.commands.sendString:
+                        case commands.sendString:
                             byte[] buf = new byte[lengthDataReceive];
                             _msReceive.ms.Read(buf, 0, lengthDataReceive);
                             string str = Encoding.Unicode.GetString(buf);
@@ -176,7 +182,7 @@ namespace server.Classes
                             _msReceive.TruncateFromTop(lengthDataReceive + lengthHead);
 
                             break;
-                        case server.commands.sendFile:
+                        case commands.sendFile:
 
                             _OnError(new Exception("File receive not complit"));
                             _msReceive.Clear();

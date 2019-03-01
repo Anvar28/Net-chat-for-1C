@@ -5,7 +5,7 @@ using System.Text;
 using System.Runtime.InteropServices;
 using System.IO;
 
-namespace server.Classes
+namespace ClassLibrary
 {
     public class IniFiles
     {
