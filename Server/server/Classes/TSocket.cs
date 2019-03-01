@@ -244,16 +244,23 @@ namespace server.Classes
             }
             catch (Exception e)
             {
-                IPHostEntry a = Dns.GetHostEntry(ip);
-                if (a.AddressList.Count() > 0)
-                    try
-                    {
-                        _socket.BeginConnect(a.AddressList[0], port, ConnectCallBack, null);
-                    }
-                    catch (Exception e1)
-                    {
-                        _OnError(e1);
-                    }
+                try
+                {
+                    IPHostEntry a = Dns.GetHostEntry(ip);
+                    if (a.AddressList.Count() > 0)
+                        try
+                        {
+                            _socket.BeginConnect(a.AddressList[0], port, ConnectCallBack, null);
+                        }
+                        catch (Exception e1)
+                        {
+                            _OnError(e1);
+                        }
+                }
+                catch (Exception e2)
+                {
+                    _OnError(e2);
+                }
                     
             }
 

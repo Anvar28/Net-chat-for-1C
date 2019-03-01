@@ -74,6 +74,7 @@ namespace client
         {
             if (title == "")
                 title = "Звонок";
+            text = text.Replace("<br>", "\r\n");
             _notifier.ShowBalloonTip(second * 1000, title, text, icon);
         }
 
@@ -135,11 +136,11 @@ namespace client
                     if (_Timer == null)
                     {
                         _Timer = new DispatcherTimer();
+                        _Timer.Tick += StartReconnectCallback;
+                        _Timer.Interval = new TimeSpan(0, 0, ReconectSecond);
                     }
                     if (!_Timer.IsEnabled)
-                    {
-                        _Timer.Tick += new EventHandler(StartReconnectCallback);
-                        _Timer.Interval = new TimeSpan(0, 0, ReconectSecond);
+                    {                                                
                         _Timer.Start();
                     }
                 }
@@ -163,15 +164,43 @@ namespace client
             );
         }
 
+        private void WriteStringChat(string str, Paragraph paragraph = null, bool bold = false)
+        {
+            Inline i;
+            Run r = new Run(str+"\r\n");
+            i = r;
+            if (bold)
+            {
+                Bold b = new Bold(r);
+                i = b;
+            }            
+            if (paragraph == null)
+            {
+                paragraph = new Paragraph();
+            }
+            paragraph.Inlines.Add(i);
+            lbChat.Document.Blocks.Add(paragraph);
+        }
+
         private void WriteMessageChat(string str)
         {
             // Update data on the form
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    lbChat.Items.Insert(0, DateTime.Now.ToString() + "\t" + str);
+                    Paragraph paragraph = new Paragraph();
+                    WriteStringChat(DateTime.Now.ToString(), paragraph, true);
+                    foreach (string item in SplitStringBR(str))
+                    {
+                        WriteStringChat(item, paragraph);
+                    }
                 }
             );
+        }
+
+        private string[] SplitStringBR(string str)
+        {
+            return str.Split(new string[] { "<br>" }, StringSplitOptions.RemoveEmptyEntries);
         }
 
         private void sendTextAndClear()
