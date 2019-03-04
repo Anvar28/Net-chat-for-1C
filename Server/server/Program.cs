@@ -205,23 +205,46 @@ namespace server
             logConsol loger = new logConsol();
             loger.Write("Start app");
 
-            TServer server = new TServer(port, loger);
-            server.Start();
+            TServer server;
+            THttpServer httpServer;
 
-            THttpServer httpServer = new THttpServer(portHttp, loger);
-            httpServer.SendStringAll = server.SendStringAll;
-            httpServer.Start();
+            try
+            {
+                server = new TServer(port, loger);
+                server.Start();
+            }
+            catch (Exception e)
+            {
+                loger.Write("Error TServer "+e.Message);
+                throw;
+            }
+
+            try
+            {
+                httpServer = new THttpServer(portHttp, loger);
+                httpServer.SendStringAll = server.SendStringAll;
+                httpServer.Start();
+            }
+            catch (Exception e)
+            {
+                loger.Write("Error THttpServer " + e.Message);
+            }
 
             while (true) {
-                string command = Console.ReadLine();
-
-                if (command == "count")
+                try
                 {
-                    Console.WriteLine(server.ClientCount.ToString());
-                }
+                    string command = Console.ReadLine();
 
-            }
-            
+                    if (command == "count")
+                    {
+                        Console.WriteLine(server.ClientCount.ToString());
+                    }
+                }
+                catch (Exception e)
+                {
+                    loger.Write("Error THttpServer " + e.Message);
+                }
+            }            
         }
     }
 }
