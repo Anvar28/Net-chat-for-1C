@@ -130,7 +130,7 @@ namespace ClassLibrary
 
         // Receive
 
-        protected internal void BeginReceive()
+        public void BeginReceive()
         {
             Array.Clear(_bufReceive, 0, _bufReceive.Length);
             try
@@ -248,7 +248,7 @@ namespace ClassLibrary
             {
                 _socket.BeginConnect(IPAddress.Parse(ip), port, ConnectCallBack, null);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 try
                 {
