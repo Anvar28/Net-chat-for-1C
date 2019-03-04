@@ -70,7 +70,7 @@ namespace client
             this._notifier.Visible = true;
         }
 
-        public void ShowBalloon(string text, int second = 3, string title="", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
+        public void ShowBalloon(string text, int second = 3, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
         {
             if (title == "")
                 title = "Звонок";
@@ -83,7 +83,7 @@ namespace client
             if (e.Button == WinForms.MouseButtons.Right)
             {
                 ContextMenu menu = (ContextMenu)this.FindResource("NotifierContextMenu");
-                menu.IsOpen = true;            
+                menu.IsOpen = true;
             }
         }
 
@@ -99,33 +99,53 @@ namespace client
 
         private void OnConnect(TSocket client)
         {
-            SetStatusControl();
-            Log(strConnect);
-            ShowBalloon(strConnect);
-            //_client.SendString(edtName.Text);
+            this.Dispatcher.Invoke(
+                delegate
+                {
+                    ChatWriteString(strConnect);
+                    SetStatusControl();
+                    Log(strConnect);
+                    ShowBalloon(strConnect);
+                    _client.SendString(edtName.Text);
+                }
+            );
         }
 
         private void OnDisconnect(TSocket client)
         {
-            Log(strDisconnect);
-            SetStatusControl();
-            ShowBalloon(strDisconnect);
+            this.Dispatcher.Invoke(
+                delegate
+                {
+                    ChatWriteString(strDisconnect);
+                    Log(strDisconnect);
+                    SetStatusControl();
+                    ShowBalloon(strDisconnect);
+                }
+            );
         }
 
         private void OnReceive(TSocket client, string str)
         {
-            WriteMessageChat(str);
-            ShowBalloon(str);
+            this.Dispatcher.Invoke(
+                delegate
+                {
+                    ChatWriteMessage(str);
+                    ShowBalloon(str);
+                }
+            );
         }
 
         private void OnError(TSocket client, Exception e)
         {
-            Log(e.Message);
-            if (!client.Connected && Reconnect)
-            {
-                // Запуск коннекта через N секунд
-                StartReconnect();
-            }
+            this.Dispatcher.Invoke(
+                delegate
+                {
+                    Log(e.Message);
+                    if (!client.Connected && Reconnect)
+                        // Запуск коннекта через N секунд
+                        StartReconnect();
+                }
+            );
         }
 
         private void StartReconnect()
@@ -133,7 +153,7 @@ namespace client
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    Log("Попытка подключения через " + ReconectSecond.ToString()+" секунд.");
+                    Log("Попытка подключения через " + ReconectSecond.ToString() + " секунд.");
                     if (_Timer == null)
                     {
                         _Timer = new DispatcherTimer();
@@ -141,7 +161,7 @@ namespace client
                         _Timer.Interval = new TimeSpan(0, 0, ReconectSecond);
                     }
                     if (!_Timer.IsEnabled)
-                    {                                                
+                    {
                         _Timer.Start();
                     }
                 }
@@ -156,9 +176,8 @@ namespace client
 
         private void Log(string str)
         {
-            // Update data on the form
             this.Dispatcher.Invoke(
-                delegate 
+                delegate
                 {
                     lbLog.Items.Insert(0, DateTime.Now.ToString() + "\t" + str);
                 }
@@ -183,15 +202,14 @@ namespace client
                 Blocks.InsertBefore(Blocks.FirstBlock, paragraph);
         }
 
-        private void WriteMessageChat(string str)
+        private void ChatWriteString(string str)
         {
-            // Update data on the form
-            this.Dispatcher.Invoke(
-                delegate
-                {
-                    ChatWriteStrings(SplitStringBR(str));
-                }
-            );
+            ChatWriteStrings(new string[] { str });
+        }
+
+        private void ChatWriteMessage(string str)
+        {
+            ChatWriteStrings(SplitStringBR(str));
         }
 
         private string[] SplitStringBR(string str)
@@ -224,22 +242,16 @@ namespace client
 
         private void SetStatusControl()
         {
-            // Update data on the form
-            this.Dispatcher.Invoke(
-                delegate
-                {
-                    btnConnect.IsEnabled = !_client.Connected;
-                    btnDisconnect.IsEnabled = !btnConnect.IsEnabled;
-                    btnSend.IsEnabled = btnDisconnect.IsEnabled;
+            btnConnect.IsEnabled = !_client.Connected;
+            btnDisconnect.IsEnabled = !btnConnect.IsEnabled;
+            btnSend.IsEnabled = btnDisconnect.IsEnabled;
 
-                    string imgBall = "Resources/BallRed.png";
-                    if (_client.Connected)
-                    {
-                        imgBall = "Resources/BallGreen.png";
-                    }
-                    imgConnect.Source = new BitmapImage(new Uri(imgBall, UriKind.Relative));
-                }
-            );
+            string imgBall = "Resources/BallRed.png";
+            if (_client.Connected)
+            {
+                imgBall = "Resources/BallGreen.png";
+            }
+            imgConnect.Source = new BitmapImage(new Uri(imgBall, UriKind.Relative));
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
