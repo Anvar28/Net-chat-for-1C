@@ -65,10 +65,4 @@
         </Grid>
     </Grid>
 
-    <Window.Resources>
-        <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
-            <MenuItem Header="Open" Click="Menu_Open"/>
-            <MenuItem Header="Close" Click="Menu_Close"/>
-        </ContextMenu>
-    </Window.Resources>
 </Window>

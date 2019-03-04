@@ -19,6 +19,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using WinForms = System.Windows.Forms;
 using ClassLibrary;
+using System.Runtime.InteropServices;
 
 namespace client
 {
@@ -27,6 +28,8 @@ namespace client
     /// </summary>
     public partial class MainWindow : Window
     {
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
 
         // Строковые константы
 
@@ -70,7 +73,7 @@ namespace client
             this._notifier.Visible = true;
         }
 
-        public void ShowBalloon(string text, int second = 3, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
+        public void ShowBalloon(string text, int second = 10, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
         {
             if (title == "")
                 title = "Звонок";
@@ -80,21 +83,7 @@ namespace client
 
         void notifier_MouseDown(object sender, WinForms.MouseEventArgs e)
         {
-            if (e.Button == WinForms.MouseButtons.Right)
-            {
-                ContextMenu menu = (ContextMenu)this.FindResource("NotifierContextMenu");
-                menu.IsOpen = true;
-            }
-        }
-
-        private void Menu_Open(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Open");
-        }
-
-        private void Menu_Close(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Close");
+            this.Activate();
         }
 
         private void OnConnect(TSocket client)
