@@ -142,5 +142,11 @@
       <Name>ClassLibrary</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\icoBallRed.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\icoBallGreen.ico" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

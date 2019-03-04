@@ -28,9 +28,6 @@ namespace client
     /// </summary>
     public partial class MainWindow : Window
     {
-        [DllImport("user32.dll")]
-        public static extern bool SetForegroundWindow(IntPtr hWnd);
-
         // Строковые константы
 
         public const string strConnect = "Соединение установлено";
@@ -69,7 +66,7 @@ namespace client
             _client.OnLog = Log;
 
             this._notifier.MouseDown += new WinForms.MouseEventHandler(notifier_MouseDown);
-            this._notifier.Icon = Properties.Resources.TrayIcon;
+            this._notifier.Icon = Properties.Resources.icoBallRed;
             this._notifier.Visible = true;
         }
 
@@ -236,11 +233,14 @@ namespace client
             btnSend.IsEnabled = btnDisconnect.IsEnabled;
 
             string imgBall = "Resources/BallRed.png";
+            System.Drawing.Icon icon = Properties.Resources.icoBallRed;
             if (_client.Connected)
             {
                 imgBall = "Resources/BallGreen.png";
+                icon = Properties.Resources.icoBallGreen;
             }
             imgConnect.Source = new BitmapImage(new Uri(imgBall, UriKind.Relative));
+            _notifier.Icon = icon;
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
