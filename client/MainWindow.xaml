@@ -59,6 +59,7 @@
                 <Button x:Name="btnSend" Content="Отправить" Click="btnSend_Click" Margin="5, 0, 10, 10" Grid.Row="1" Grid.Column="1"/>
                 <FlowDocumentScrollViewer x:Name="lbChat"  Margin="10" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" IsToolBarVisible ="True">
                     <FlowDocument Background="White">
+                        
                     </FlowDocument>
                 </FlowDocumentScrollViewer>
             </Grid>

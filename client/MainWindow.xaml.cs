@@ -72,10 +72,13 @@ namespace client
 
         public void ShowBalloon(string text, int second = 10, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
         {
-            if (title == "")
-                title = "Звонок";
-            text = text.Replace("<br>", "\r\n");
-            _notifier.ShowBalloonTip(second * 1000, title, text, icon);
+            if (text.Trim().Length > 0)
+            {
+                if (title == "")
+                    title = "Звонок";
+                text = text.Replace("<br>", "\r\n");
+                _notifier.ShowBalloonTip(second * 1000, title, text, icon);
+            }
         }
 
         void notifier_MouseDown(object sender, WinForms.MouseEventArgs e)
@@ -115,8 +118,11 @@ namespace client
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    ChatWriteMessage(str);
-                    ShowBalloon(str);
+                    if (str.Trim().Length > 0)
+                    {
+                        ChatWriteMessage(str);
+                        ShowBalloon(str);
+                    }
                 }
             );
         }
@@ -172,6 +178,8 @@ namespace client
 
         private void ChatWriteStrings(string[] mStr)
         {
+            if (mStr.Count() == 0)
+                return;
 
             Paragraph paragraph = new Paragraph();
             paragraph.Inlines.Add(new Bold(new Run(DateTime.Now.ToString() + "\r\n")));
@@ -206,6 +214,7 @@ namespace client
         private void sendTextAndClear()
         {
             _client.SendString(edtText.Text);
+            ChatWriteString(edtText.Text);
             edtText.Text = "";
         }
 

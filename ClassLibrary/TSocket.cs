@@ -227,7 +227,7 @@ namespace ClassLibrary
             _msReceive.Write(_bufReceive, 0, bufLen);
 
             // processing data
-            _Log("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
+            //_Log("Receive data length: " + bufLen.ToString() + " save to _MS, length _MS: " + _msReceive.Length.ToString());
             _statusReceive = ProcessingData();
 
             // receive continue

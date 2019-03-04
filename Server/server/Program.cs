@@ -65,7 +65,7 @@ namespace server
 
         private void AcceptCallBack(IAsyncResult ar)
         {
-            loger.Write("Connect new client");
+            Log("Connect new client");
             TServerClientSocket clientSocket = new TServerClientSocket(serverSocket.EndAccept(ar));
             clientSocket.OnLog = Log;
             clientSocket.OnDisconnect = DisconnectClient;
@@ -73,6 +73,7 @@ namespace server
             clientSocket.OnError = ErrorClient;
             clientSocket.BeginReceive();
             ClientList.Add(clientSocket);
+            Log("Connect new client. Count client " + ClientList.Count.ToString());
             BeginAccept();
         }
 
@@ -91,6 +92,14 @@ namespace server
                     item.SendString(str);
                 
             }
+        }
+
+        public int ClientCount
+        {
+            get
+            {
+                return ClientList.Count;
+            }            
         }
     }
 
@@ -203,7 +212,16 @@ namespace server
             httpServer.SendStringAll = server.SendStringAll;
             httpServer.Start();
 
-            Console.ReadLine();
+            while (true) {
+                string command = Console.ReadLine();
+
+                if (command == "count")
+                {
+                    Console.WriteLine(server.ClientCount.ToString());
+                }
+
+            }
+            
         }
     }
 }

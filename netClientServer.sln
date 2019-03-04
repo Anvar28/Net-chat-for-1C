@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "server", "Server\server\ser
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "client", "client\client.csproj", "{CC28E85E-4147-4AC3-9B9C-CF84B252247A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "clientConsole", "clientConsole\clientConsole.csproj", "{23D6A51A-3704-4EF8-8398-E682B26276C3}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassLibrary", "ClassLibrary\ClassLibrary.csproj", "{6658CD05-B82C-41DD-B105-2FC1C7746B32}"
 EndProject
 Global
@@ -25,10 +23,6 @@ Global
 		{CC28E85E-4147-4AC3-9B9C-CF84B252247A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CC28E85E-4147-4AC3-9B9C-CF84B252247A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CC28E85E-4147-4AC3-9B9C-CF84B252247A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{23D6A51A-3704-4EF8-8398-E682B26276C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{23D6A51A-3704-4EF8-8398-E682B26276C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{23D6A51A-3704-4EF8-8398-E682B26276C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{23D6A51A-3704-4EF8-8398-E682B26276C3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6658CD05-B82C-41DD-B105-2FC1C7746B32}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6658CD05-B82C-41DD-B105-2FC1C7746B32}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6658CD05-B82C-41DD-B105-2FC1C7746B32}.Release|Any CPU.ActiveCfg = Release|Any CPU
