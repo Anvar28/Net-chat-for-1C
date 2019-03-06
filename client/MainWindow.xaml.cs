@@ -51,6 +51,9 @@ namespace client
         private WinForms.NotifyIcon _notifier = new WinForms.NotifyIcon();
         private DispatcherTimer _Timer;
         private bool Reconnect = true;
+        private MiniWindow _miniWindow;
+        private TFlowDocument _fd;
+        private bool _IsClosing = false;
 
         // Методы
 
@@ -68,17 +71,13 @@ namespace client
             this._notifier.MouseDown += new WinForms.MouseEventHandler(notifier_MouseDown);
             this._notifier.Icon = Properties.Resources.icoBallRed;
             this._notifier.Visible = true;
+
+            _fd = new TFlowDocument(lbChat.Document);
         }
 
-        public void ShowBalloon(string text, int second = 10, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
+        public void ShowBalloon(string text, int second = 5, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
         {
-            if (text.Trim().Length > 0)
-            {
-                if (title == "")
-                    title = "Звонок";
-                text = text.Replace("<br>", "\r\n");
-                _notifier.ShowBalloonTip(second * 1000, title, text, icon);
-            }
+            _miniWindow.Show(text, second);
         }
 
         void notifier_MouseDown(object sender, WinForms.MouseEventArgs e)
@@ -105,10 +104,13 @@ namespace client
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    ChatWriteString(strDisconnect);
-                    Log(strDisconnect);
-                    SetStatusControl();
-                    ShowBalloon(strDisconnect);
+                    if (!_IsClosing)
+                    {
+                        ChatWriteString(strDisconnect);
+                        Log(strDisconnect);
+                        SetStatusControl();
+                        ShowBalloon(strDisconnect);
+                    }
                 }
             );
         }
@@ -120,7 +122,7 @@ namespace client
                 {
                     if (str.Trim().Length > 0)
                     {
-                        ChatWriteMessage(str);
+                        ChatWriteString(str);
                         ShowBalloon(str);
                     }
                 }
@@ -178,30 +180,10 @@ namespace client
 
         private void ChatWriteStrings(string[] mStr)
         {
-            if (mStr.Count() == 0)
-                return;
-
-            Paragraph paragraph = new Paragraph();
-            paragraph.Inlines.Add(new Bold(new Run(DateTime.Now.ToString() + "\r\n")));
-
-            foreach (string item in mStr)
-            {
-                paragraph.Inlines.Add(new Run(item + "\r\n"));
-            }
-
-            BlockCollection Blocks = lbChat.Document.Blocks;
-            if (Blocks.Count == 0)
-                Blocks.Add(paragraph);
-            else
-                Blocks.InsertBefore(Blocks.FirstBlock, paragraph);
+            _fd.Write(_fd.CreateParagraph(mStr));
         }
 
         private void ChatWriteString(string str)
-        {
-            ChatWriteStrings(new string[] { str });
-        }
-
-        private void ChatWriteMessage(string str)
         {
             ChatWriteStrings(SplitStringBR(str));
         }
@@ -254,6 +236,8 @@ namespace client
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            _IsClosing = true;
+
             if (_client.Connected)
             {
                 _client.Disconnect();
@@ -313,6 +297,8 @@ namespace client
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            _miniWindow = new MiniWindow(this);
+
             PropertyLoad();
 
             btnChat.IsChecked = true;
