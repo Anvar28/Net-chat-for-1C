@@ -37,6 +37,16 @@ namespace client
 
             _fd = new TFlowDocument(lbChat.Document);
             _title = App.Current.MainWindow.Title;
+
+            SetPosition();
+        }
+
+        public void SetPosition()
+        {
+            // set position window
+            System.Drawing.Size resolution = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Size;
+            this.Left = resolution.Width - this.Width;
+            this.Top = resolution.Height - this.Height - 50;
         }
 
         private void TimerCallback(object sender, EventArgs e)
