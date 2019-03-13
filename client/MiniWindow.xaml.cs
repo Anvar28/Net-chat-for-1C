@@ -24,12 +24,11 @@ namespace client
         private int _secondOpenWindow;
         private string _title;
         private TFlowDocument _fd;
+        private bool _canClose = false;
 
-        public MiniWindow(Window _Owner)
+        public MiniWindow()
         {
             InitializeComponent();
-
-            this.Owner = _Owner;
 
             _Timer = new DispatcherTimer();
             _Timer.Tick += TimerCallback;
@@ -38,15 +37,18 @@ namespace client
             _fd = new TFlowDocument(lbChat.Document);
             _title = App.Current.MainWindow.Title;
 
+            Topmost = true;
+            WindowStyle = WindowStyle.ToolWindow;
+
             SetPosition();
         }
 
         public void SetPosition()
         {
             // set position window
-            System.Drawing.Size resolution = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Size;
+            System.Drawing.Size resolution = System.Windows.Forms.Screen.PrimaryScreen.WorkingArea.Size;
             this.Left = resolution.Width - this.Width;
-            this.Top = resolution.Height - this.Height - 50;
+            this.Top = resolution.Height - this.Height;
         }
 
         private void TimerCallback(object sender, EventArgs e)
@@ -79,5 +81,20 @@ namespace client
             
             base.Show();
         }
-    }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (!_canClose)
+            {
+                e.Cancel = true;
+                Hide();
+            }
+        }
+
+        public new void Close()
+        {
+            _canClose = true;
+            base.Close();
+        }
+   }
 }

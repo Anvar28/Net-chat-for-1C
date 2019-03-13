@@ -53,7 +53,8 @@ namespace client
         private bool Reconnect = true;
         private MiniWindow _miniWindow;
         private TFlowDocument _fd;
-        private bool _IsClosing = false;
+        private bool _isClosing = false;
+        private bool _canClose = false;
 
         // Методы
 
@@ -73,16 +74,22 @@ namespace client
             this._notifier.Visible = true;
 
             _fd = new TFlowDocument(lbChat.Document);
+
+            this.StateChanged += Window_StateChanged;
         }
 
-        public void ShowBalloon(string text, int second = 5, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
+        public void ShowBalloon(string text, int second = 10, string title = "", WinForms.ToolTipIcon icon = WinForms.ToolTipIcon.Info)
         {
             _miniWindow.Show(text, second);
         }
 
         void notifier_MouseDown(object sender, WinForms.MouseEventArgs e)
         {
-            this.Activate();
+            if (!this.IsVisible)
+            {
+                this.Show();
+            }
+            this.Focus();
         }
 
         private void OnConnect(TSocket client)
@@ -90,11 +97,14 @@ namespace client
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    ChatWriteString(strConnect);
-                    SetStatusControl();
-                    Log(strConnect);
-                    ShowBalloon(strConnect);
-                    _client.SendString(edtName.Text);
+                    if (!_isClosing)
+                    {
+                        ChatWriteString(strConnect);
+                        SetStatusControl();
+                        Log(strConnect);
+                        ShowBalloon(strConnect);
+                        _client.SendString(edtName.Text);
+                    }
                 }
             );
         }
@@ -104,7 +114,7 @@ namespace client
             this.Dispatcher.Invoke(
                 delegate
                 {
-                    if (!_IsClosing)
+                    if (!_isClosing)
                     {
                         ChatWriteString(strDisconnect);
                         Log(strDisconnect);
@@ -236,17 +246,27 @@ namespace client
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            _IsClosing = true;
-
-            if (_client.Connected)
+            if (_canClose)
             {
-                _client.Disconnect();
+                _isClosing = true;
+
+                if (_client.Connected)
+                {
+                    _client.Disconnect();
+                }
+
+                _notifier.Visible = false;
+                _notifier.Dispose();
+
+                _miniWindow.Close();
+
+                PropertySave();
             }
-
-            _notifier.Visible = false;
-            _notifier.Dispose();
-
-            PropertySave();
+            else
+            {
+                e.Cancel = true;
+                this.Hide();
+            }
         }
 
         private void btnSend_Click(object sender, RoutedEventArgs e)
@@ -297,7 +317,7 @@ namespace client
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            _miniWindow = new MiniWindow(this);
+            _miniWindow = new MiniWindow();
 
             PropertyLoad();
 
@@ -322,6 +342,18 @@ namespace client
             ini.Write(iniSection, iniIP, edtIP.Text);
             ini.Write(iniSection, iniPort, edtPort.Text);
             ini.Write(iniSection, iniName, edtName.Text);
+        }
+
+        private void Window_StateChanged(object sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized)
+                Hide();
+        }
+
+        private void btnExit_Checked(object sender, RoutedEventArgs e)
+        {
+            _canClose = true;
+            Close();
         }
     }
 }

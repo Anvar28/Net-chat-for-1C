@@ -27,6 +27,7 @@
             <RadioButton x:Name="btnChat" Content="Чат" MinWidth="100" FontSize="14" Checked="btn_Checked"/>
             <RadioButton x:Name="btnLogs" Content="Логи" MinWidth="100" FontSize="14" Checked="btn_Checked"/>
             <RadioButton x:Name="btnProperties" Content="Наcтройки" MinWidth="100" FontSize="14" Checked="btn_Checked"/>
+            <RadioButton x:Name="btnExit" Content="Выход" MinWidth="100" FontSize="14" Checked="btnExit_Checked"/>
         </ToolBar>
         <Grid Grid.ColumnSpan="2" Grid.Row="2" Grid.Column="0" Margin="0">
             <Grid.ColumnDefinitions>
